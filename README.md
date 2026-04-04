@@ -1,6 +1,6 @@
 # Agentic Search
 
-The system takes a topic query, then searches the web, scrapes the top results, sends the content to the LLM, and extracts real-world entities into a structured table — with descriptions, categories, and traceable source URLs.
+The system takes a topic query, then searches the web, scrapes the top results, sends the content to the LLM, and extracts real-world entities into a structured table — with descriptions, and traceable source URLs.
 
 **Live Demo:** [https://agentic-search-vm0s.onrender.com/](https://agentic-search-vm0s.onrender.com/)
 
@@ -51,17 +51,17 @@ Query: "top pizza places in brooklyn"
 ### Core (Challenge Requirements)
 
 - **Topic query input** — search bar for testing
-- **Web search** — DuckDuckGo integration
+- **Web search** — DuckDuckGo is used for websearch. Chosen over Serper because Serper only gives 2500 free searches.
 - **Page scraping** — concurrent async fetching with trafilatura for clean text extraction
-- **LLM entity extraction** — Llama 3.1 70B extracts structured entity data from scraped content
-- **Structured output** — 5-column table: Entity, Description, Category, Sources
+- **LLM entity extraction** — LLM extracts structured entity data from scraped content
+- **Structured output** — 3-column table: Entity, Description, Sources
 - **Source traceability** — every entity links back to the specific page(s) it was found on
 
 ### Beyond the Basics
 
 - **LLM provider fallback chain** — OpenRouter is the primary provider; if it fails (rate limit, timeout, server error), the system automatically retries with nv-api.
 - **Session caching with query normalization** — Same queries return instantly from an in-memory cache. Normalization lowercases, strips punctuation, removes stop words, deplurializes, and sorts alphabetically. So `"best pizza places in karachi"` and `"Karachi pizza place"` hit the same cache entry.
-- **Entity descriptions and categories** — each entity includes a one-sentence description and a category label (e.g., Restaurant, Tool).
+- **Entity descriptions** — each entity includes a one-sentence description.
 - **Multiple source citations** — entities list every page URL where they were mentioned.
 - **JSON and CSV export** — download results with one click for further analysis.
 ---
@@ -97,7 +97,7 @@ Query: "top pizza places in brooklyn"
 ### Prerequisites
 
 - Python 3.10+
-- At least one API key: [OpenRouter](https://openrouter.ai/) or [NVIDIA NIM](https://build.nvidia.com/)
+- At least one API key: [OpenRouter](https://openrouter.ai/) or nv-api
 
 ### Steps
 
@@ -142,14 +142,5 @@ uvicorn main:app --reload
 - **Text truncation** — cutting at 3,000 characters may miss entities mentioned later in long articles.
 - **Search quality** — depends entirely on DuckDuckGo's ranking for the query.
 - **Cache is in-memory** — cleared on server restart; not persisted across sessions.
-
----
-
-## Example Queries
-
-- `AI startups in healthcare`
-- `open source database tools`
-- `electric vehicle companies`
-- `top pizza places in brooklyn`
 
 ---
