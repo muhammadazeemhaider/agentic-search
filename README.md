@@ -133,7 +133,7 @@ uvicorn main:app --reload
 | **Normalized caching** | Caching for semantically matching queries would require using an embedding model which adds another overhead compute cost and will slow down the system. As a result, simple lexical and normalized caching is implemented. |
 | **Number of Pages being retrieved** | The number of pages to retrieve is kept 5. A higher number of pages was taking longer time for the entire solution to complete. |
 | **Number of Entities** | 10 entities will be retrieved everytime. This is because if I do not set a number, at times the system takes close to 3-4 minutes to retrieve 50-60 entities. |
-| **Text truncation** — page text capped at 3,000 characters to reduce token usage and latency. Most important information in articles and pages are usually found in the earlier part of the articles. |
+| **Text truncation** | page text capped at 3,000 characters to reduce token usage and latency. Most important information in articles and pages are usually found in the earlier part of the articles. |
 ---
 
 ## Known Limitations
