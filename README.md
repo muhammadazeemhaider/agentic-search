@@ -1,87 +1,155 @@
-returns 10 results always. Have added this as a condition.
-
 # Agentic Search
 
-A web application that takes a topic query, searches the web, scrapes the top results, passes the content to an open-source LLM (Llama 3.1 70B), extracts named entities matching the query, and returns them in a structured table with source URLs. The entire system is a linear four-step pipeline: **Search → Fetch → Extract → Return.**
+The system takes a topic query, then searches the web, scrapes the top results, sends the content to the LLM, and extracts real-world entities into a structured table — with descriptions, categories, and traceable source URLs.
 
-## Architecture
+**Live Demo:** [https://agentic-search-vm0s.onrender.com/](https://agentic-search-vm0s.onrender.com/)
+
+> Using Renders Free tier - first load may take ~30s if the instance has spun down.
+
+---
+
+## The solution and how it works
+
+The system runs a four-step pipeline for every query:
 
 ```
-Query
+Query: "top pizza places in brooklyn"
   │
   ▼
-┌─────────────────┐
-│  1. Web Search  | DuckDuckGo (duckduckgo-search)
-│     → URLs      │
-└────────┬────────┘
+┌──────────────────┐
+│  1. Web Search   │
+│     → URLs       │
+└────────┬─────────┘
          │
          ▼
-┌─────────────────┐
-│  2. Fetch Pages │  httpx (async, concurrent) + trafilatura
-│     → Text      │
-└────────┬────────┘
+┌──────────────────┐
+│  2. Fetch Pages  │
+│     → Clean Text │
+└────────┬─────────┘
          │
          ▼
-┌─────────────────┐
-│  3. LLM Extract │  Llama 3.1 70B via OpenRouter or NVIDIA NIM
-│     → Entities  │
-└────────┬────────┘
+┌──────────────────┐
+│  3. LLM Extract  │
+│     → Entities   │
+└────────┬─────────┘
          │
          ▼
-┌─────────────────┐
-│  4. Return JSON │  FastAPI response with entities + metadata
-└─────────────────┘
+┌──────────────────┐
+│  4. Return JSON  │
+└──────────────────┘
 ```
 
-The backend is a single FastAPI file (`main.py`). The frontend is a single HTML file (`static/index.html`) with all CSS and JavaScript inline. No frameworks, no build step.
+1. **Search** — Sends the query to DuckDuckGo and collects the top result URLs.
+2. **Fetch** — Downloads all pages concurrently with `asyncio.gather()` and extracts clean body text using trafilatura (strips nav, ads, scripts, footers).
+3. **Extract** — Builds a prompt containing the query + page texts, sends it to Llama 3.1 70B, and parses the structured JSON response.
+4. **Return** — Validates entities with Pydantic, attaches timing/page metadata, and sends the response to the frontend.
 
-## Design Decisions
+---
 
-- **trafilatura over BeautifulSoup**: Purpose-built for web content extraction. One function call replaces 30+ lines of manual HTML stripping — it handles navigation, scripts, footers, sidebars, and ads automatically.
-- **httpx over requests**: Async-native HTTP client that pairs with FastAPI's async model and enables parallel fetching with `asyncio.gather()`.
-- **Concurrent fetching**: `asyncio.gather()` fetches all pages in parallel, reducing 5 sequential HTTP requests from ~10s to ~2-3s.
-- **DuckDuckGo**: Zero API key friction — no account required, no billing setup. Good enough result quality for entity discovery.
-- **Open-source LLM via API**: Llama 3.1 70B is powerful enough for structured entity extraction. Hosted APIs (OpenRouter / NVIDIA NIM) avoid GPU infrastructure management.
-- **Dual provider support**: OpenRouter and NVIDIA NIM both use OpenAI-compatible chat completions format, so only the endpoint URL, model string, and API key differ. Minimal code to support both.
-- **Raw httpx for LLM calls**: No `openai` SDK dependency. A single `httpx.post()` to an OpenAI-compatible endpoint is simpler and more transparent.
-- **Single-file simplicity**: Entire backend is one Python file, entire frontend is one HTML file — easy to read, easy to modify, easy to deploy.
-- **Text truncation at 3,000 characters**: Keeps token usage low and reduces latency. Entities typically appear early in page content.
+## Features
 
-## Known Limitations
+### Core (Challenge Requirements)
 
-- **No caching** — repeated queries re-search and re-fetch every time.
-- **Bot-blocked pages** — sites that block automated requests or require JavaScript rendering will be skipped silently.
-- **Truncation** — cutting text at 3,000 characters may miss entities mentioned later in long articles.
-- **Deduplication** — relies on the LLM's in-prompt instructions to avoid duplicates; no post-processing dedup.
-- **Search quality** — depends on DuckDuckGo's ranking for the given query.
-- **Rate limits** — heavy use may trigger rate limits on the LLM provider.
+- **Topic query input** — search bar for testing
+- **Web search** — DuckDuckGo integration
+- **Page scraping** — concurrent async fetching with trafilatura for clean text extraction
+- **LLM entity extraction** — Llama 3.1 70B extracts structured entity data from scraped content
+- **Structured output** — 5-column table: Entity, Description, Category, Sources
+- **Source traceability** — every entity links back to the specific page(s) it was found on
 
-## Setup
+### Beyond the Basics
+
+- **LLM provider fallback chain** — OpenRouter is the primary provider; if it fails (rate limit, timeout, server error), the system automatically retries with nv-api.
+- **Session caching with query normalization** — Same queries return instantly from an in-memory cache. Normalization lowercases, strips punctuation, removes stop words, deplurializes, and sorts alphabetically. So `"best pizza places in karachi"` and `"Karachi pizza place"` hit the same cache entry.
+- **Entity descriptions and categories** — each entity includes a one-sentence description and a category label (e.g., Restaurant, Tool).
+- **Multiple source citations** — entities list every page URL where they were mentioned.
+- **JSON and CSV export** — download results with one click for further analysis.
+---
+
+## File Structure
+
+```
+├── main.py                    # FastAPI entry point — routes, CORS, static files
+├── requirements.txt           # Python dependencies
+├── .env                       # API keys (not committed to git)
+│
+├── src/
+│   ├── pipeline.py            # Orchestrator — wires the 4 steps, caching, error handling
+│   │
+│   ├── models/
+│   │   ├── schemas.py         # Pydantic models (SearchRequest, Entity, SearchResponse)
+│   │   └── llm.py             # LLM client — provider fallback, raw httpx calls
+│   │
+│   └── services/
+│       ├── search.py          # Step 1: DuckDuckGo web search
+│       ├── scraper.py         # Step 2: async page fetching + trafilatura extraction
+│       └── extractor.py       # Step 3: prompt building + LLM JSON parsing
+│
+└── static/
+    ├── index.html             # Frontend — vanilla HTML/JS, no framework
+    └── style.css              # Dark theme, DM Mono font, CSS variables
+```
+
+---
+
+## Local Setup
+
+### Prerequisites
+
+- Python 3.10+
+- At least one API key: [OpenRouter](https://openrouter.ai/) or [NVIDIA NIM](https://build.nvidia.com/)
+
+### Steps
 
 ```bash
 # 1. Clone the repository
-git clone <repo-url> && cd <repo-name>
+git clone https://github.com/<your-username>/agentic-search.git
+cd agentic-search
 
-# 2. Create a virtual environment
+# 2. Create and activate a virtual environment
 python -m venv venv
-source venv/bin/activate   # Windows: venv\Scripts\activate
+source venv/bin/activate        # On Windows: venv\Scripts\activate
 
 # 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Configure API keys — edit .env with at least one key:
-#    OPENROUTER_API_KEY=your_key
-#    NVIDIA_API_KEY=your_key
+# 4. Create a .env file with your API key(s)
+echo "OPENROUTER_API_KEY=your_key_here" > .env
+echo "NVIDIA_API_KEY=your_key_here" >> .env
+# At least one key is required. Both enables automatic fallback.
 
-# 5. Run the server
+# 5. Start the server
 uvicorn main:app --reload
-
-# 6. Open http://localhost:8000
 ```
+
+---
+
+## Design Decisions
+
+| Decision | Why |
+|---|---|
+| **trafilatura** | Purpose-built for web content extraction. One function call replaces 30+ lines of manual HTML stripping — handles nav, scripts, footers, ads automatically. |
+| **Service Providers** | Provided two API service providers in openrouter and nv-api, so if fails, there is a fallback. |
+| **Normalized caching** | Caching for semantically matching queries would require using an embedding model which adds another overhead compute cost and will slow down the system. As a result, simple lexical and normalized caching is implemented. |
+| **Number of Pages being retrieved** | The number of pages to retrieve is kept 5. A higher number of pages was taking longer time for the entire solution to complete. |
+| **Number of Entities** | 10 entities will be retrieved everytime. This is because if I do not set a number, at times the system takes close to 3-4 minutes to retrieve 50-60 entities. |
+| **Text truncation** — page text capped at 3,000 characters to reduce token usage and latency. Most important information in articles and pages are usually found in the earlier part of the articles. |
+---
+
+## Known Limitations
+
+- **Bot-blocked pages** — sites that block automated requests or require JavaScript rendering are silently skipped.
+- **Text truncation** — cutting at 3,000 characters may miss entities mentioned later in long articles.
+- **Search quality** — depends entirely on DuckDuckGo's ranking for the query.
+- **Cache is in-memory** — cleared on server restart; not persisted across sessions.
+
+---
 
 ## Example Queries
 
-- "AI startups in healthcare"
-- "open source database tools"
-- "top pizza places in brooklyn"
-- "electric vehicle companies"
+- `AI startups in healthcare`
+- `open source database tools`
+- `electric vehicle companies`
+- `top pizza places in brooklyn`
+
+---
