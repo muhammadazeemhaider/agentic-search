@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+httpx
+trafilatura
+ddgs
+python-dotenv
