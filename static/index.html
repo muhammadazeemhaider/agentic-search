@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agentic Search</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <!-- <div class="header-label">AGENTIC SEARCH</div> -->
+    <div class="header-sub">search any topic &middot; extract real-world entities from the web</div>
+
+    <div class="search-row">
+      <input type="text" class="search-input" id="queryInput" placeholder="e.g., AI startups in healthcare">
+      <button class="search-btn" id="searchBtn">search</button>
+    </div>
+
+    <div class="examples" id="examples">
+      <span class="examples-label">try:</span>
+      <button class="pill" data-query="AI healthcare startups">AI healthcare startups</button>
+      <button class="pill" data-query="open source databases">open source databases</button>
+      <button class="pill" data-query="electric vehicle companies">electric vehicle companies</button>
+    </div>
+
+    <div class="status" id="status"></div>
+    <div class="results" id="results"></div>
+    <!-- <div class="footer">powered by llama 3.1 &middot; duckduckgo &middot; trafilatura</div> -->
+  </div>
+
+  <script>
+    const input = document.getElementById('queryInput');
+    const btn = document.getElementById('searchBtn');
+    const statusEl = document.getElementById('status');
+    const resultsEl = document.getElementById('results');
+    const examplesEl = document.getElementById('examples');
+    let dotInterval = null;
+    let timerInterval = null;
+    let startTime = null;
+
+    function startDots() {
+      let count = 0;
+      const frames = ['\u00b7', '\u00b7\u00b7', '\u00b7\u00b7\u00b7'];
+      dotInterval = setInterval(() => {
+        btn.textContent = frames[count % 3];
+        count++;
+      }, 300);
+    }
+
+    function stopDots() {
+      clearInterval(dotInterval);
+      dotInterval = null;
+      btn.textContent = 'search';
+    }
+
+    function startTimer() {
+      startTime = performance.now();
+      timerInterval = setInterval(() => {
+        const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
+        statusEl.textContent = `searching... ${elapsed}s`;
+      }, 100);
+    }
+
+    function stopTimer() {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+
+    function setLoading(on) {
+      input.disabled = on;
+      btn.disabled = on;
+      if (on) { startDots(); startTimer(); }
+      else { stopDots(); stopTimer(); }
+    }
+
+    function domainFrom(url) {
+      try {
+        return new URL(url).hostname.replace(/^www\./, '');
+      } catch { return url; }
+    }
+
+    let lastData = null;
+
+    function buildSourceLinks(sources) {
+      if (!sources || sources.length === 0) return '';
+      return sources.map(url =>
+        `<a href="${esc(url)}" target="_blank" rel="noopener" title="${esc(url)}">${esc(domainFrom(url))}</a>`
+      ).join('<span>&middot;</span>');
+    }
+
+    function buildTable(entities) {
+      const rows = entities.map((e, i) =>
+        `<tr>
+          <td class="cell-num">${i + 1}</td>
+          <td class="cell-name">${esc(e.name)}</td>
+          <td class="cell-desc">${esc(e.description || '')}</td>
+          <td class="cell-sources">${buildSourceLinks(e.sources)}</td>
+        </tr>`
+      ).join('');
+      return `<div class="table-wrap"><table>
+        <thead><tr><th>#</th><th>Entity</th><th>Description</th><th>Sources</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      <div class="export-bar">
+        <button class="export-btn" onclick="exportJSON()">export json</button>
+        <button class="export-btn" onclick="exportCSV()">export csv</button>
+      </div>`;
+    }
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function downloadFile(content, filename, mime) {
+      const blob = new Blob([content], { type: mime });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    function exportJSON() {
+      if (!lastData) return;
+      downloadFile(JSON.stringify(lastData, null, 2), 'entities.json', 'application/json');
+    }
+
+    function exportCSV() {
+      if (!lastData || !lastData.entities.length) return;
+      const csvEsc = s => '"' + String(s).replace(/"/g, '""') + '"';
+      const header = 'Name,Description,Sources';
+      const rows = lastData.entities.map(e =>
+        [e.name, e.description || '', (e.sources || []).join(' | ')].map(csvEsc).join(',')
+      );
+      downloadFile(header + '\n' + rows.join('\n'), 'entities.csv', 'text/csv');
+    }
+
+    async function doSearch() {
+      const query = input.value.trim();
+      if (!query) return;
+
+      setLoading(true);
+      statusEl.className = 'status';
+      resultsEl.innerHTML = '';
+
+      try {
+        const resp = await fetch('/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, top_n: 5 }),
+        });
+        const data = await resp.json();
+
+        if (!resp.ok) throw new Error(data.detail || 'Request failed');
+
+        if (data.metadata.error) {
+          statusEl.className = 'status error';
+          statusEl.textContent = data.metadata.error;
+        } else if (data.entities.length === 0) {
+          statusEl.textContent = 'no entities found for this query';
+        } else {
+          lastData = data;
+          statusEl.textContent = `found ${data.entities.length} entities in ${data.metadata.time_seconds}s from ${data.metadata.pages_succeeded} pages`;
+          examplesEl.style.display = 'none';
+          document.body.classList.add('has-results');
+          resultsEl.innerHTML = buildTable(data.entities);
+        }
+      } catch (err) {
+        statusEl.className = 'status error';
+        statusEl.textContent = err.message;
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    btn.addEventListener('click', doSearch);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
+
+    document.querySelectorAll('.pill').forEach(pill => {
+      pill.addEventListener('click', () => { input.value = pill.dataset.query; });
+    });
+  </script>
+</body>
+</html>
