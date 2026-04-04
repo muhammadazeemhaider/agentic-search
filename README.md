@@ -11,25 +11,25 @@ Query
   │
   ▼
 ┌─────────────────┐
-│  1. Web Search   │  DuckDuckGo (duckduckgo-search)
-│     → URLs       │
+│  1. Web Search  | DuckDuckGo (duckduckgo-search)
+│     → URLs      │
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│  2. Fetch Pages  │  httpx (async, concurrent) + trafilatura
-│     → Text       │
+│  2. Fetch Pages │  httpx (async, concurrent) + trafilatura
+│     → Text      │
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│  3. LLM Extract  │  Llama 3.1 70B via OpenRouter or NVIDIA NIM
-│     → Entities   │
+│  3. LLM Extract │  Llama 3.1 70B via OpenRouter or NVIDIA NIM
+│     → Entities  │
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│  4. Return JSON  │  FastAPI response with entities + metadata
+│  4. Return JSON │  FastAPI response with entities + metadata
 └─────────────────┘
 ```
 
