@@ -9,10 +9,10 @@ log = logging.getLogger("pipeline.extractor")
 MAX_ENTITIES = 10
 
 SYSTEM_PROMPT = (
-    "You are an entity extraction assistant. Given web page content from a "
-    "search query, extract all distinct real-world entities that are relevant "
-    "to the query. Return ONLY a valid JSON array with no markdown formatting, "
-    "no backticks, no explanation before or after."
+    """You are an entity extraction assistant. Given web page content from a 
+    search query, extract all distinct real-world entities that are relevant 
+    to the query. Return ONLY a valid JSON array with no markdown formatting,
+    no backticks, no explanation before or after."""
 )
 
 
@@ -27,7 +27,7 @@ def _build_user_prompt(query: str, pages: list[dict]) -> str:
         "Extract every distinct entity relevant to the query from the pages above.\n"
         "\n"
         "Return this exact JSON format:\n"
-        '[{"name": "Entity Name", "description": "One sentence describing this entity", "sources": ["url1", "url2"]}]\n'
+        '[{"name": "Entity Name", "description": "One sentence describing this entity", "sources": ["url1", "url2", ... , "urlN"]}]\n'
         "\n"
         "Rules:\n"
         "- Only include entities that are actual specific real-world things matching the query intent\n"
@@ -67,7 +67,6 @@ def _parse_llm_json(raw: str) -> list[dict]:
 
     log.warning("Could not parse LLM response as JSON")
     return []
-
 
 async def extract_entities(
     query: str,

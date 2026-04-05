@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 class SearchRequest(BaseModel):
     query: str
-    top_n: int = 5
+    top_n: int = 10
 
 class Entity(BaseModel):
     name: str

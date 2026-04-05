@@ -48,7 +48,7 @@ Query: "top pizza places in brooklyn"
 
 ## Features
 
-### Core (Challenge Requirements)
+### Core Requirements
 
 - **Topic query input** — search bar for testing
 - **Web search** — DuckDuckGo is used for websearch. Chosen over Serper because Serper only gives 2500 free searches.
@@ -57,10 +57,10 @@ Query: "top pizza places in brooklyn"
 - **Structured output** — 3-column table: Entity, Description, Sources
 - **Source traceability** — every entity links back to the specific page(s) it was found on
 
-### Beyond the Basics
+### Additional Features
 
 - **LLM provider fallback chain** — OpenRouter is the primary provider; if it fails (rate limit, timeout, server error), the system automatically retries with nv-api.
-- **Session caching with query normalization** — Same queries return instantly from an in-memory cache. Normalization lowercases, strips punctuation, removes stop words, deplurializes, and sorts alphabetically. So `"best pizza places in karachi"` and `"Karachi pizza place"` hit the same cache entry.
+- **Session caching with query normalization** — Same queries return instantly from an in-memory cache. Normalization lowercases, strips punctuation, removes stop words, deplurializes, and sorts alphabetically. So `"best pizza places in Amherst"` and `"Amherst pizza place"` hit the same cache entry.
 - **Entity descriptions** — each entity includes a one-sentence description.
 - **Multiple source citations** — entities list every page URL where they were mentioned.
 - **JSON and CSV export** — download results with one click for further analysis.
@@ -71,10 +71,9 @@ Query: "top pizza places in brooklyn"
 ```
 ├── main.py                    # FastAPI entry point — routes, CORS, static files
 ├── requirements.txt           # Python dependencies
-├── .env                       # API keys (not committed to git)
 │
 ├── src/
-│   ├── pipeline.py            # Orchestrator — wires the 4 steps, caching, error handling
+│   ├── pipeline.py      
 │   │
 │   ├── models/
 │   │   ├── schemas.py         # Pydantic models (SearchRequest, Entity, SearchResponse)
@@ -131,8 +130,8 @@ uvicorn main:app --reload
 | **trafilatura** | Purpose-built for web content extraction. One function call replaces 30+ lines of manual HTML stripping — handles nav, scripts, footers, ads automatically. |
 | **Service Providers** | Provided two API service providers in openrouter and nv-api, so if fails, there is a fallback. |
 | **Normalized caching** | Caching for semantically matching queries would require using an embedding model which adds another overhead compute cost and will slow down the system. As a result, simple lexical and normalized caching is implemented. |
-| **Number of Pages being retrieved** | The number of pages to retrieve is kept 5. A higher number of pages was taking longer time for the entire solution to complete. |
-| **Number of Entities** | 10 entities will be retrieved everytime. This is because if I do not set a number, at times the system takes close to 3-4 minutes to retrieve 50-60 entities. |
+| **Number of Pages being retrieved** | The number of pages to retrieve is 10. A higher number of pages was taking longer time for the entire solution to complete. |
+| **Number of Entities** | 10 entities will be retrieved at max everytime. This is to ensure that the system does not take too long to retrieve all the entities. Speed was preferred in this choice over retrieving all the entities. |
 | **Text truncation** | page text capped at 3,000 characters to reduce token usage and latency. Most important information in articles and pages are usually found in the earlier part of the articles. |
 ---
 
